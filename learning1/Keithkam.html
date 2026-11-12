@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>苍穹突击 · 战斗机</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+SC:wght@400;600;800&display=swap');
+:root{color-scheme:dark;--cyan:#69f5ff;--orange:#ffb14d;--ink:#07121e}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#173c57 0,#091521 48%,#050b12 100%);color:#effaff;font-family:'Noto Sans SC',sans-serif;display:grid;place-items:center;padding:22px}
+.shell{width:min(100%,1000px)}header{display:flex;justify-content:space-between;align-items:end;margin:0 2px 12px}.eyebrow{font:700 11px Orbitron,sans-serif;letter-spacing:.3em;color:var(--cyan)}h1{font-size:clamp(25px,5vw,40px);margin:5px 0 0;letter-spacing:.08em}.hint{color:#a6c1d0;font-size:13px}.hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:9px}.stat,.game-wrap{border:1px solid #82d9e52c;background:#071520cc;box-shadow:0 12px 40px #0005}.stat{border-radius:11px;padding:9px 13px}.stat label{display:block;color:#8ba8b8;font-size:10px;letter-spacing:.12em}.stat strong{font:700 18px Orbitron,sans-serif;color:#f5fcff}.stat.lives strong{color:#ff8181}.game-wrap{position:relative;border-radius:15px;padding:8px;overflow:hidden}canvas{display:block;width:100%;height:auto;aspect-ratio:900/560;border-radius:9px;background:#071624;touch-action:none}.overlay{position:absolute;inset:8px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(180deg,#071625a8,#07111bd9);text-align:center;padding:24px}.overlay.hidden{display:none}.panel{max-width:450px}.badge{font:700 10px Orbitron;color:var(--cyan);letter-spacing:.35em}.panel h2{font-size:clamp(26px,5vw,42px);margin:12px 0 8px}.panel p{color:#afc5d3;line-height:1.75;margin:0 0 20px}.primary{border:0;border-radius:8px;background:linear-gradient(110deg,#6ef7ff,#58baff);color:#06121c;padding:12px 27px;font:900 14px 'Noto Sans SC';letter-spacing:.1em;cursor:pointer;box-shadow:0 0 26px #58dbff50}.primary:hover{filter:brightness(1.12);transform:translateY(-1px)}.keys{font-size:11px;color:#7895a7;margin-top:14px}.bottom{display:flex;justify-content:space-between;gap:12px;color:#88a5b7;font-size:12px;margin:10px 3px}.bottom b{color:#dffaff}.touch{display:none;justify-content:center;gap:13px;margin-top:10px}.touch button{width:60px;height:48px;border-radius:12px;border:1px solid #8eeaff55;background:#0c2738;color:#b9f8ff;font-size:22px;touch-action:none}
+@media(max-width:600px){body{padding:12px}.hint{display:none}.stat{padding:7px 8px}.stat label{font-size:9px}.stat strong{font-size:15px}.bottom{font-size:10px}.touch{display:flex}}
+</style>
+</head>
+<body><main class="shell">
+<header><div><div class="eyebrow">SKYWARD DEFENSE · FLIGHT 01</div><h1>苍穹突击</h1></div><div class="hint">拦截敌机，守住最后防线</div></header>
+<section class="hud" aria-label="游戏状态"><div class="stat"><label>得分 SCORE</label><strong id="score">000000</strong></div><div class="stat"><label>最高分 BEST</label><strong id="best">000000</strong></div><div class="stat"><label>波次 WAVE</label><strong id="wave">01</strong></div><div class="stat lives"><label>护甲 ARMOR</label><strong id="lives">♥ ♥ ♥</strong></div></section>
+<div class="game-wrap"><canvas id="game" width="900" height="560" aria-label="战斗机游戏区域"></canvas><div class="overlay" id="overlay"><div class="panel"><div class="badge">AIR DEFENSE SYSTEM ONLINE</div><h2 id="title">准备起飞</h2><p id="message">驾驶战斗机穿越敌方空域。击落敌机赚取分数，避开敌方火力，坚持得越久，敌机越快。</p><button class="primary" id="start">开始任务</button><div class="keys">移动：WASD / 方向键　·　开火：空格　·　手机：拖动战机</div></div></div></div>
+<div class="touch"><button data-dir="left" aria-label="向左">←</button><button data-dir="up" aria-label="向上">↑</button><button data-dir="down" aria-label="向下">↓</button><button data-dir="right" aria-label="向右">→</button><button data-fire="1" aria-label="开火">✦</button></div>
+<div class="bottom"><span>✦ 自动补给：每隔一段时间获得额外火力</span><span><b>提示</b>　优先击落红色精英机</span></div></main>
+<script>
+(()=>{'use strict';
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),W=900,H=560;
+const scoreEl=document.querySelector('#score'),bestEl=document.querySelector('#best'),waveEl=document.querySelector('#wave'),livesEl=document.querySelector('#lives'),overlay=document.querySelector('#overlay'),titleEl=document.querySelector('#title'),messageEl=document.querySelector('#message'),startBtn=document.querySelector('#start');
+let best=Number(localStorage.getItem('skywardBest')||0),score=0,lives=3,wave=1,running=false,last=0,elapsed=0,spawn=0,shot=0,stars=[],bullets=[],foeShots=[],enemies=[],particles=[],keys={},pointer=null,fireHeld=false,player={x:450,y:470,r:18,invuln:0};
+bestEl.textContent=fmt(best);for(let i=0;i<95;i++)stars.push({x:Math.random()*W,y:Math.random()*H,s:.5+Math.random()*2,v:25+Math.random()*90});
+function fmt(n){return String(n).padStart(6,'0')}function hud(){scoreEl.textContent=fmt(score);bestEl.textContent=fmt(best);waveEl.textContent=String(wave).padStart(2,'0');livesEl.textContent='♥ '.repeat(lives).trim()||'—'}
+function reset(){score=0;lives=3;wave=1;elapsed=0;spawn=0;shot=0;bullets=[];foeShots=[];enemies=[];particles=[];player={x:450,y:470,r:18,invuln:1.5};hud()}
+function begin(){reset();running=true;overlay.classList.add('hidden');last=performance.now();requestAnimationFrame(loop)}
+function end(){running=false;titleEl.textContent='任务结束';messageEl.innerHTML=`最终得分 <b style="color:#69f5ff">${fmt(score)}</b><br>你守住了防线 ${Math.floor(elapsed)} 秒，继续挑战更高纪录！`;startBtn.textContent='再次出击';overlay.classList.remove('hidden')}
+startBtn.addEventListener('click',begin);
+function path(x,y,r){ctx.beginPath();ctx.moveTo(x,y-r*1.5);ctx.lineTo(x+r*.43,y-r*.25);ctx.lineTo(x+r*1.35,y+r*.62);ctx.lineTo(x+r*.42,y+r*.42);ctx.lineTo(x,y+r);ctx.lineTo(x-r*.42,y+r*.42);ctx.lineTo(x-r*1.35,y+r*.62);ctx.lineTo(x-r*.43,y-r*.25);ctx.closePath()}
+function drawPlayer(){ctx.save();ctx.translate(player.x,player.y);if(player.invuln>0&&Math.floor(elapsed*12)%2)ctx.globalAlpha=.4;ctx.shadowBlur=24;ctx.shadowColor='#46e7ff';path(0,0,player.r);let g=ctx.createLinearGradient(0,-25,0,22);g.addColorStop(0,'#f5ffff');g.addColorStop(.48,'#55deef');g.addColorStop(1,'#167cae');ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#c9ffff';ctx.lineWidth=1.4;ctx.stroke();ctx.shadowBlur=13;ctx.fillStyle='#ffe17b';ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,31+Math.random()*8);ctx.lineTo(5,18);ctx.fill();ctx.restore()}
+function spawnEnemy(){const elite=Math.random()<Math.min(.13+.02*wave,.32),x=45+Math.random()*(W-90),hp=elite?3:1;enemies.push({x,y:-30,r:elite?21:16,hp,max:hp,speed:(elite?68:82)+wave*9,phase:Math.random()*6.28,elite,fire:1+Math.random()*2})}
+function burst(x,y,color,n=12){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,v=35+Math.random()*180;particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.35+Math.random()*.5,max:.85,color,size:2+Math.random()*3})}}
+function hit(){if(player.invuln>0)return;lives--;player.invuln=1.35;burst(player.x,player.y,'#ff7680',22);hud();if(lives<=0)end()}
+function update(dt){elapsed+=dt;wave=1+Math.floor(elapsed/22);player.invuln=Math.max(0,player.invuln-dt);let dx=0,dy=0;if(keys.ArrowLeft||keys.a)dx--;if(keys.ArrowRight||keys.d)dx++;if(keys.ArrowUp||keys.w)dy--;if(keys.ArrowDown||keys.s)dy++;if(pointer){player.x+=(pointer.x-player.x)*Math.min(1,dt*12);player.y+=(pointer.y-player.y)*Math.min(1,dt*12)}else{let m=Math.hypot(dx,dy)||1;player.x+=dx/m*300*dt;player.y+=dy/m*300*dt}player.x=Math.max(28,Math.min(W-28,player.x));player.y=Math.max(45,Math.min(H-35,player.y));
+for(const s of stars){s.y+=s.v*dt;if(s.y>H){s.y=0;s.x=Math.random()*W}}
+spawn-=dt;if(spawn<=0){spawn=Math.max(.3,1.05-wave*.065);spawnEnemy()}
+shot-=dt;if((keys[' ']||fireHeld)&&shot<=0){bullets.push({x:player.x-8,y:player.y-15,v:510},{x:player.x+8,y:player.y-15,v:510});shot=.19}
+for(const b of bullets)b.y-=b.v*dt;bullets=bullets.filter(b=>b.y>-12);
+for(const e of enemies){e.y+=e.speed*dt;e.x+=Math.sin(elapsed*1.7+e.phase)*(e.elite?42:22)*dt;e.fire-=dt;if(e.fire<=0&&e.y>20&&e.y<H-100){foeShots.push({x:e.x,y:e.y+14,v:185+wave*8});e.fire=e.elite?1.15+Math.random()*.7:1.8+Math.random()*1.8}if(e.y>H+20) e.gone=true}
+for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];for(let j=bullets.length-1;j>=0;j--){const b=bullets[j];if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+5){bullets.splice(j,1);e.hp--;if(e.hp<=0){burst(e.x,e.y,e.elite?'#ff8d65':'#ffc36c',e.elite?20:11);score+=e.elite?250:100;best=Math.max(best,score);localStorage.setItem('skywardBest',best);e.gone=true;hud()}break}}if(Math.hypot(e.x-player.x,e.y-player.y)<e.r+player.r*.7){e.gone=true;burst(e.x,e.y,'#ff995c');hit()}if(e.gone)enemies.splice(i,1)}
+for(const b of foeShots){b.y+=b.v*dt;if(Math.hypot(b.x-player.x,b.y-player.y)<player.r*.7+5){b.dead=true;hit()}}foeShots=foeShots.filter(b=>!b.dead&&b.y<H+10);
+for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.98;p.life-=dt}particles=particles.filter(p=>p.life>0)
+}
+function draw(){ctx.clearRect(0,0,W,H);let bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#0b2030');bg.addColorStop(1,'#07111c');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);for(const s of stars){ctx.globalAlpha=.3+s.s*.27;ctx.fillStyle=s.s>1.8?'#a9faff':'#85bcd4';ctx.fillRect(s.x,s.y,s.s,s.s*2.8)}ctx.globalAlpha=1;
+// faint radar lanes
+ctx.strokeStyle='#67dfff0b';ctx.lineWidth=1;for(let x=0;x<W;x+=75){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=(elapsed*35)%75;y<H;y+=75){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+for(const b of bullets){ctx.shadowBlur=12;ctx.shadowColor='#62f5ff';ctx.fillStyle='#c8ffff';ctx.fillRect(b.x-2,b.y-10,4,14)}ctx.shadowBlur=0;
+for(const e of enemies){ctx.save();ctx.translate(e.x,e.y);ctx.rotate(Math.PI);ctx.shadowBlur=e.elite?18:10;ctx.shadowColor=e.elite?'#ff665b':'#ffab62';path(0,0,e.r);ctx.fillStyle=e.elite?'#ed5c60':'#f3a65c';ctx.fill();ctx.strokeStyle=e.elite?'#ffc1a0':'#ffe1ac';ctx.lineWidth=1.4;ctx.stroke();ctx.shadowBlur=0;if(e.elite){ctx.fillStyle='#361921';ctx.fillRect(-e.r,-e.r-10,e.r*2,3);ctx.fillStyle='#ff7467';ctx.fillRect(-e.r,-e.r-10,e.r*2*(e.hp/e.max),3)}ctx.restore()}
+ctx.shadowBlur=12;ctx.shadowColor='#ff6f69';for(const b of foeShots){ctx.fillStyle='#ff917d';ctx.beginPath();ctx.arc(b.x,b.y,5,0,7);ctx.fill()}ctx.shadowBlur=0;
+for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.size,p.size)}ctx.globalAlpha=1;if(running)drawPlayer();
+ctx.fillStyle='#c4f5ff75';ctx.font='12px Orbitron';ctx.fillText('ALT  '+Math.max(0,Math.floor((H-player.y)/10)).toString().padStart(3,'0'),18,H-17);ctx.fillText('SECTOR  '+String(wave).padStart(2,'0'),W-100,H-17)}
+function loop(now){if(!running)return;const dt=Math.min((now-last)/1000,.035);last=now;update(dt);draw();if(running)requestAnimationFrame(loop)}
+function coords(ev){const r=canvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*W/r.width,y:(ev.clientY-r.top)*H/r.height}}
+canvas.addEventListener('pointerdown',e=>{pointer=coords(e);canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(e.buttons)pointer=coords(e)});canvas.addEventListener('pointerup',()=>{pointer=null});canvas.addEventListener('pointercancel',()=>{pointer=null});
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.key===' '&& !running)begin()});window.addEventListener('keyup',e=>keys[e.key]=false);document.querySelectorAll('[data-dir]').forEach(b=>{const d=b.dataset.dir;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[{left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'}[d]]=true});for(const ev of ['pointerup','pointerleave','pointercancel'])b.addEventListener(ev,()=>keys[{left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'}[d]]=false)});const fireBtn=document.querySelector('[data-fire]');fireBtn.addEventListener('pointerdown',e=>{e.preventDefault();fireHeld=true});for(const ev of ['pointerup','pointerleave','pointercancel'])fireBtn.addEventListener(ev,()=>fireHeld=false);
+hud();draw();
+})();
+</script></body></html>
