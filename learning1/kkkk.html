@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>线上报名表格</title>
+
+    <!-- 连接 CSS -->
+    <link rel="stylesheet" href="kkkk.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>📝 活动报名表</h1>
+        <p class="subtitle">请填写以下资料完成报名</p>
+
+        <form id="registrationForm">
+
+            <label for="name">姓名</label>
+            <input
+                type="text"
+                id="name"
+                placeholder="请输入你的姓名"
+                required
+            >
+
+            <label for="phone">电话号码</label>
+            <input
+                type="tel"
+                id="phone"
+                placeholder="请输入电话号码"
+                required
+            >
+
+            <label for="email">Gmail</label>
+            <input
+                type="email"
+                id="email"
+                placeholder="example@gmail.com"
+                required
+            >
+
+            <div class="confirm">
+                <input type="checkbox" id="agree" required>
+                <label for="agree">
+                    我确认以上资料填写正确
+                </label>
+            </div>
+
+            <button type="submit">确认报名</button>
+
+        </form>
+
+        <div id="message"></div>
+
+    </div>
+
+    <!-- 连接 JavaScript -->
+    <script src="kkkk.js"></script>
+
+</body>
+</html>
